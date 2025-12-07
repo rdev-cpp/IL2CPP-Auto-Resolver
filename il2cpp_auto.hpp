@@ -1,33 +1,63 @@
 #pragma once
-#include <cstdint>
-#include <unordered_map>
-#include <string>
 #include <Windows.h>
+#include <string>
+#include <unordered_map>
+#include <shared_mutex>
+#include <mutex>
 
 namespace IL2CPP_Auto {
-    class CAutoIL2CPP {
+    class Resolver {
     private:
-        static std::unordered_map<std::string, uintptr_t> m_CachedAddresses;
-        static HMODULE m_IL2CPPModule;
+        inline static HMODULE m_IL2CPPModule = nullptr;
+        inline static std::unordered_map<std::string, uintptr_t> m_Cache;
+        inline static std::shared_mutex m_Mutex;
 
-        static bool FindIL2CPPModule();
-        static void CacheAllFunctions();
+        static HMODULE GetModule() {
+            if (m_IL2CPPModule) return m_IL2CPPModule;
+            m_IL2CPPModule = GetModuleHandleA("GameAssembly.dll");
+            return m_IL2CPPModule;
+        }
+
+        static uintptr_t ResolveExport(const std::string& name) {
+            HMODULE mod = GetModule();
+            if (!mod) return 0;
+            return reinterpret_cast<uintptr_t>(GetProcAddress(mod, name.c_str()));
+        }
 
     public:
-        static bool Initialize();
-
-        template<typename T>
-        static T GetFunction(const std::string& name) {
-            auto it = m_CachedAddresses.find(name);
-            if (it != m_CachedAddresses.end()) {
-                return reinterpret_cast<T>(it->second);
-            }
-            return nullptr;
+        static bool Initialize() {
+            return GetModule() != nullptr;
         }
 
         static uintptr_t GetAddress(const std::string& name) {
-            auto it = m_CachedAddresses.find(name);
-            return (it != m_CachedAddresses.end()) ? it->second : 0;
+            {
+                std::shared_lock<std::shared_mutex> lock(m_Mutex);
+                auto it = m_Cache.find(name);
+                if (it != m_Cache.end()) {
+                    return it->second;
+                }
+            }
+
+            uintptr_t addr = ResolveExport(name);
+            if (addr == 0) return 0;
+
+            {
+                std::unique_lock<std::shared_mutex> lock(m_Mutex);
+                m_Cache[name] = addr;
+            }
+
+            return addr;
+        }
+
+        template<typename T = void*>
+        static T GetFunction(const std::string& name) {
+            return reinterpret_cast<T>(GetAddress(name));
+        }
+
+        static void ClearCache() {
+            std::unique_lock<std::shared_mutex> lock(m_Mutex);
+            m_Cache.clear();
+            m_IL2CPPModule = nullptr;
         }
     };
 }
