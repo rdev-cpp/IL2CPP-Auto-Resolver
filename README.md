@@ -20,18 +20,22 @@ C++ library for automatic discovery and caching of IL2CPP function addresses in 
 ```cpp
 #include "il2cpp_auto.hpp"
 
-// Initialize library (does all the heavy lifting)
-if (IL2CPP_Auto::CAutoIL2CPP::Initialize()) {
-    // Get any IL2CPP function with full type safety
-    auto class_from_name = IL2CPP_Auto::CAutoIL2CPP::GetFunction<
-        void*(*)(const char*, const char*)>("il2cpp_class_from_name");
-    
-    auto resolve_icall = IL2CPP_Auto::CAutoIL2CPP::GetFunction<
-        void*(*)(const char*)>("il2cpp_resolve_icall");
-    
-    // Use the functions immediately
-    if (class_from_name && resolve_icall) {
-        void* camera_class = class_from_name("UnityEngine", "Camera");
-        void* get_main = resolve_icall("UnityEngine.Camera::get_main");
+// Check if GameAssembly.dll is loaded (Optional but recommended)
+if (IL2CPP_Auto::Resolver::Initialize()) {
+
+    // 1. Get functions using Lazy Loading (Resolved & Cached on first call)
+    // You can define the function type for safety:
+    using il2cpp_domain_get_t = void* (*)();
+
+    auto domain_get = IL2CPP_Auto::Resolver::GetFunction<il2cpp_domain_get_t>("il2cpp_domain_get");
+
+    // 2. Or cast directly inline:
+    auto thread_attach = IL2CPP_Auto::Resolver::GetFunction<void*(*)(void*)>("il2cpp_thread_attach");
+
+    // 3. Use functions securely (Thread-Safe)
+    if (domain_get && thread_attach) {
+        void* domain = domain_get();
+        void* thread = thread_attach(domain);
     }
 }
+
