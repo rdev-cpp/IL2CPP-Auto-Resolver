@@ -17,6 +17,12 @@ namespace IL2CPP_Auto {
             HMODULE mod = m_IL2CPPModule.load(std::memory_order_acquire);
             if (mod) return mod;
 
+            static std::mutex init_mutex;
+            std::lock_guard<std::mutex> lock(init_mutex);
+
+            mod = m_IL2CPPModule.load(std::memory_order_relaxed);
+            if (mod) return mod;
+
             mod = GetModuleHandleA("GameAssembly.dll");
             if (!mod) mod = GetModuleHandleA("UnityPlayer.dll");
 
