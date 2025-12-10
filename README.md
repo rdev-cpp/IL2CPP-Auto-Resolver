@@ -17,6 +17,12 @@
 - **Broad Compatibility** - Works with most IL2CPP Unity versions
 - **Header-Only** - Single file inclusion, no linking required
 
+## Requirements
+
+- C++17 or higher compiler (`/std:c++17` or higher)
+- Windows platform
+- Unity game built with IL2CPP backend
+
 ## Installation
 
 Simply add `il2cpp_auto.hpp` to your project and include it:
